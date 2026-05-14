@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>{{TITLE}}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    color: #2a2a28; margin: 0; padding: 40px 32px;
+    font-size: 15px; line-height: 1.55; background: #fff;
+  }
+  .container { max-width: 1700px; margin: 0 auto; }
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 24px; margin-bottom: 24px;
+  }
+  .header-left { flex: 1; min-width: 0; }
+  h1 { font-size: 24px; font-weight: 500; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 500; margin: 32px 0 14px; }
+  .meta { color: #6f6e6a; font-size: 13px; }
+
+  .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; font-size: 13px; font-weight: 500; color: #2a2a28;
+    background: #fff; border: 0.5px solid #d3d1c7; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn:hover { background: #f8f7f3; border-color: #888780; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .btn svg { width: 14px; height: 14px; }
+
+  /* Верхняя рекомендация */
+  .top-verdict {
+    margin-bottom: 28px; padding: 22px 26px;
+    background: linear-gradient(135deg, #f3faf4 0%, #eaf5ec 100%);
+    border-radius: 12px; border-left: 4px solid #1d9e75;
+  }
+  .top-verdict .scores {
+    display: flex; gap: 32px; margin-bottom: 12px; flex-wrap: wrap;
+  }
+  .score-block { display: flex; align-items: baseline; gap: 8px; }
+  .score-block .label { color: #6f6e6a; font-size: 13px; }
+  .score-block .value { font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+  .score-block.winner .value { color: #1d9e75; }
+  .top-verdict .conclusion { font-size: 15px; line-height: 1.55; color: #2a2a28; }
+  .top-verdict .conclusion strong { font-weight: 600; }
+
+  .screens-compare {
+    display: grid; gap: 16px;
+    background: #f8f7f3; border-radius: 10px; padding: 20px; margin-bottom: 24px;
+  }
+  .screens-compare.cols-2 { grid-template-columns: 1fr 1fr; }
+  .screens-compare.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .screens-compare.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .screen-card {
+    background: #fff; border: 0.5px solid #d3d1c7; border-radius: 8px;
+    padding: 12px; text-decoration: none; color: inherit;
+  }
+  .screen-card:hover { border-color: #888780; }
+  .screen-card img {
+    display: block; width: 100%; height: auto;
+    border-radius: 4px; border: 0.5px solid #ece9df;
+  }
+  .screen-card .caption { margin-top: 10px; font-size: 14px; color: #444441; font-weight: 600; }
+  .screen-card .subcaption { font-size: 12px; color: #6f6e6a; margin-top: 4px; }
+  .screen-textonly {
+    background: #fff; border: 0.5px dashed #b4b2a9; border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .screen-textonly .caption { font-size: 13px; color: #444441; font-weight: 500; }
+  .screen-textonly .subcaption { font-size: 12px; color: #6f6e6a; margin-top: 4px; }
+
+  /* Таблица */
+  .table-wrap { overflow-x: auto; border: 0.5px solid #d3d1c7; border-radius: 10px; background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1300px; }
+  th, td { text-align: left; padding: 14px 16px; border-bottom: 0.5px solid #ece9df; vertical-align: top; }
+  th { font-weight: 500; color: #5f5e5a; font-size: 12px; background: #f8f7f3; letter-spacing: 0.02em; border-bottom: 0.5px solid #d3d1c7; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf6; }
+
+  .col-type        { width: 130px; }
+  .col-heur        { width: 200px; font-weight: 500; }
+  .col-compare     { width: 160px; }
+  .col-problem     { width: auto; min-width: 320px; }
+  .col-risk        { width: 150px; }
+  .col-criticality { width: 130px; }
+  .col-action      { width: auto; min-width: 280px; }
+
+  .icon { font-size: 16px; line-height: 1; }
+
+  .cmp-1, .cmp-2, .cmp-3, .cmp-4, .cmp-tie {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+  }
+  .cmp-1.strong { background: #d4e5f8; color: #0d3d6e; font-weight: 600; }
+  .cmp-1.soft   { background: #eef4fb; color: #4878a8; }
+  .cmp-2.strong { background: #e8ddf2; color: #4d1a72; font-weight: 600; }
+  .cmp-2.soft   { background: #f4ecfa; color: #8e63b3; }
+  .cmp-3.strong { background: #f8e2d4; color: #6e3d0d; font-weight: 600; }
+  .cmp-3.soft   { background: #fbf2ee; color: #a87248; }
+  .cmp-4.strong { background: #d4f2e3; color: #0d6e3d; font-weight: 600; }
+  .cmp-4.soft   { background: #eefbf4; color: #48a878; }
+  .cmp-tie { background: #ececec; color: #5e5e5e; }
+
+  .good td { color: #b4b2a9; }
+  .good td:first-child, .good td:nth-child(2), .good td:nth-child(3), .good td:nth-child(5), .good td:nth-child(6) { color: inherit; }
+
+  /* Сильные стороны */
+  .strengths { margin-top: 28px; display: grid; gap: 16px; }
+  .strengths.cols-2 { grid-template-columns: 1fr 1fr; }
+  .strengths.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .strengths.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .strength-card { padding: 18px 20px; border-radius: 10px; border: 0.5px solid #d3d1c7; }
+  .strength-card.c1 { background: #f3f8fd; border-left: 3px solid #1c548c; }
+  .strength-card.c2 { background: #f9f3fc; border-left: 3px solid #6b2a8a; }
+  .strength-card.c3 { background: #fdf6f0; border-left: 3px solid #8c5a1c; }
+  .strength-card.c4 { background: #f0fdf6; border-left: 3px solid #1c8c5a; }
+  .strength-card h3 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #2a2a28; display: flex; align-items: baseline; gap: 8px; }
+  .strength-card h3 .strength-score {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6f6e6a;
+    margin-left: auto;
+  }
+  .strength-card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+  .strength-card li { margin-bottom: 6px; }
+
+  .hybrid {
+    margin-top: 24px; padding: 22px 26px;
+    background: #fff8eb; border: 0.5px solid #ead9b5; border-radius: 12px;
+  }
+  .hybrid h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; color: #6e5b2b; }
+  .hybrid p { margin: 0; font-size: 15px; line-height: 1.55; }
+  .hybrid p strong { font-weight: 600; }
+
+  .disclaimer {
+    margin-top: 24px; padding: 12px 16px;
+    background: #faf4e8; border: 0.5px solid #ead9b5; border-radius: 8px;
+    color: #6e5b2b; font-size: 12px;
+  }
+
+  @media print {
+    @page { size: A3 landscape; margin: 12mm; }
+    body { padding: 0; font-size: 12px; }
+    .actions { display: none !important; }
+    .table-wrap { overflow: visible; }
+    table { min-width: auto; font-size: 11px; }
+    th, td { padding: 8px 10px; }
+    tr, .strength-card, .hybrid, .screen-card, .top-verdict { page-break-inside: avoid; }
+  }
+  body.exporting .actions { visibility: hidden; }
+  body.exporting #audit-root {
+    padding: 24px;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 0;
+    width: 1700px !important;
+    max-width: 1700px !important;
+    min-width: 1700px;
+  }
+  body.exporting .table-wrap {
+    overflow: visible !important;
+  }
+  body.exporting .col-type { width: 130px !important; }
+  body.exporting .col-heur { width: 200px !important; }
+  body.exporting .col-compare { width: 160px !important; }
+  body.exporting .col-risk { width: 150px !important; }
+  body.exporting .col-criticality { width: 130px !important; }
+  body.exporting .col-problem,
+  body.exporting .col-action {
+    width: 440px !important;
+    min-width: 440px !important;
+    max-width: 440px !important;
+  }
+  body.exporting table { table-layout: fixed; }
+  body.exporting .cmp-1,
+  body.exporting .cmp-2,
+  body.exporting .cmp-3,
+  body.exporting .cmp-4,
+  body.exporting .cmp-tie {
+    white-space: normal !important;
+    line-height: 1.3;
+  }
+</style>
+</head>
+<body>
+<div class="container" id="audit-root">
+  <div class="header">
+    <div class="header-left">
+      <h1>{{TITLE}}</h1>
+      <div class="meta">{{META}}</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="pdf-btn" onclick="downloadPDF()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Скачать PDF
+      </button>
+      <button class="btn" id="jpeg-btn" onclick="downloadJPEG()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Скачать JPEG
+      </button>
+    </div>
+  </div>
+
+  <div class="top-verdict">
+    <div class="scores">{{SCORES_HTML}}</div>
+    <div class="conclusion">{{TOP_CONCLUSION}}</div>
+  </div>
+
+  <h2>Что сравниваем</h2>
+  <div class="screens-compare cols-{{CONCEPTS_COUNT}}">{{SCREENS_HTML}}</div>
+
+  <h2>Сравнение по 10 эвристикам</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-type">Тип</th>
+          <th class="col-heur">Эвристика</th>
+          <th class="col-compare">Сравнение</th>
+          <th class="col-problem">Проблема</th>
+          <th class="col-risk">Риск</th>
+          <th class="col-criticality">Критичность</th>
+          <th class="col-action">Что сделать</th>
+        </tr>
+      </thead>
+      <tbody>
+{{ROWS_HTML}}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Сильные стороны каждого концепта</h2>
+  <div class="strengths cols-{{CONCEPTS_COUNT}}">{{STRENGTHS_HTML}}</div>
+
+{{HYBRID_HTML}}
+
+{{DISCLAIMER_HTML}}
+</div>
+
+<script>
+window.ARTIFACT_PREFIX = 'ux-compare';
+
+function fileBaseName(prefix) {
+  return (prefix || 'ux-audit') + '-' + new Date().toISOString().slice(0, 10);
+}
+
+async function downloadJPEG() {
+  const btn = document.getElementById('jpeg-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Готовим...';
+  document.body.classList.add('exporting');
+  try {
+    if (typeof html2canvas === 'undefined') {
+      throw new Error('Библиотека html2canvas не загрузилась');
+    }
+    // Ждём reflow после добавления body.exporting (max-width snyat, overflow visible)
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const node = document.getElementById('audit-root');
+    const width = Math.max(node.scrollWidth, node.offsetWidth);
+    const canvas = await html2canvas(node, {
+      scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      windowWidth: width + 100,
+      width: width
+    });
+    canvas.toBlob(function(blob) {
+      if (!blob) { alert('Не удалось создать JPEG'); return; }
+      const link = document.createElement('a');
+      link.download = fileBaseName(window.ARTIFACT_PREFIX) + '.jpg';
+      link.href = URL.createObjectURL(blob);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    }, 'image/jpeg', 0.92);
+  } catch (err) {
+    alert('Не удалось сохранить JPEG: ' + err.message);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    document.body.classList.remove('exporting');
+  }
+}
+
+async function downloadPDF() {
+  const btn = document.getElementById('pdf-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Готовим...';
+  document.body.classList.add('exporting');
+  try {
+    if (typeof html2canvas === 'undefined') throw new Error('html2canvas не загрузился');
+    if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF не загрузился');
+    // Ждём reflow после добавления body.exporting (max-width snyat, overflow visible)
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const node = document.getElementById('audit-root');
+    const width = Math.max(node.scrollWidth, node.offsetWidth);
+    const canvas = await html2canvas(node, {
+      scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      windowWidth: width + 100,
+      width: width
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    // Ручное скачивание через blob — обходит блокировку sandbox через window.open
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = fileBaseName(window.ARTIFACT_PREFIX) + '.pdf';
+    link.href = url;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (err) {
+    alert('Не удалось сохранить PDF в preview: ' + err.message + '\n\nПопробуй скачать HTML-файл (кнопка «Скачать» вверху артефакта) и открыть его локально в браузере — там кнопки точно работают.');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    document.body.classList.remove('exporting');
+  }
+}
+</script>
+</body>
+</html>
